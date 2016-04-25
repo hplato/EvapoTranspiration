@@ -10,7 +10,7 @@ import sys
 import json
 import traceback
 
-debug = os.getenv('NJCDEBUG', 0)                          # Turn on debug messages
+debug =  1 #os.getenv('NJCDEBUG', 0)                          # Turn on debug messages
 
 from datetime import date, datetime, timedelta
 
@@ -177,6 +177,7 @@ def getTZoneOffset(tz):
         try:
             tnow = pytz.utc.localize(datetime.utcnow())
             tdelta = tnow.astimezone(pytz.timezone(tz)).utcoffset()
+            #print 'In getTZoneOffset t=%s t.days=%s t.seconds=%s gmt=%s' % (tdelta.days * 96 + tdelta.seconds / 900 + 48, tdelta.days, tdelta.seconds, (86400 * tdelta.days + tdelta.seconds) / 3600)
             return {'t'  : tdelta.days * 96 + tdelta.seconds / 900 + 48,
                     'gmt': (86400 * tdelta.days + tdelta.seconds) / 3600}
         except:
@@ -198,7 +199,8 @@ def getwuData():
         #req = requests.get('http://api.wunderground.com/api/' + key
         #                   + '/astronomy/yesterday/conditions/forecast/q/'
         #                    + loc + '.json')
-        req = requests.get('http://mozart.uucp/data/' + key + '/' + loc + '.json')
+        #req = requests.get('http://mozart.uucp/data/' + key + '/' + loc + '.json')
+        req = requests.get('http://192.168.0.50/' + loc + '.json')
         wuData = req.json()
 
         # Last chance to get that timezone information
@@ -232,11 +234,15 @@ def getForecastData(data):
                 fadjust[day] = safe_float(mm[day],  -1) * \
                               (safe_float(cor[day], -1) / 100) * \
                                safe_float(wfc[day], -1)
+                #print 'test %s mm[day]=%s cor[day]=%s wfc[day]=%s fadjust[day]=%s' % (day, mm[day], cor[day], wfc[day], fadjust[day])
+                #print 'test2 %s mm[day]=%s cor[day]=%s wfc[day]=%s' % (day, safe_float(mm[day],  -1), (safe_float(cor[day], -1) / 100), safe_float(wfc[day], -1))
+                
                 #
             #
         except:
             return -1
         #
+        #print '[fadjust = ' + str(fadjust) + ']'
         return sum(fadjust)
     #
 #
@@ -351,6 +357,7 @@ def sun_block(sunrise, sunset):
         # Now let's find the data for each hour there are more periods than hours so only grab the first
         for period in range(len(wuData['history']['observations'])):
             if safe_int(wuData['history']['observations'][period]['date']['hour'], -1) == hour:
+            	#print '[%s,%s]' % (wuData['history']['observations'][period]['date']['hour'], wuData['history']['observations'][period]['conds'])
                 if wuData['history']['observations'][period]['conds']:
                     try:
                         cloudCover = safe_float(conditions[wuData['history']['observations'][period]['conds']], 5) / 10
@@ -369,7 +376,6 @@ def sun_block(sunrise, sunset):
         #
 
         previousCloudCover = cloudCover
-
         # Got something now? let's check
         if cloudCover != -1:
             sh += 1 - cloudCover
@@ -955,6 +961,8 @@ rainfall      = min(safe_float(hist['precipm']), safe_float(rainfallsatpoint))
 ##                             Calculations                                               ##
 ############################################################################################
 # Calc Rn
+print 'py1 [lat=%s,tmin=%s,tmax=%s,tmean=%s,alt=%s,tdew=%s,doy=%s,shour=%s,rmin=%s,rmax=%s,%s,%s,%s]' % (lat,tmin,tmax,tmean,alt,tdew,doy,sun_hours,rh_min,rh_max,meanwindspeed,rainfall,rainfallsatpoint)
+
 
 e_tmin   = delta_sat_vap_pres(tmin)
 e_tmax   = delta_sat_vap_pres(tmax)
@@ -965,6 +973,9 @@ irl      = inv_rel_dist_earth_sun(doy)
 etrad    = et_rad(lat, sd, sha, irl)
 cs_rad   = clear_sky_rad(alt, etrad)
 Ra       = None
+
+print 'py2 [e_tmin=%s e_tmax=%s sd=%s sha=%s dl_hours=%s irl=%s etrad=%s cs_rad=%s]' % (e_tmin,e_tmax,sd,sha,dl_hours,irl,etrad,cs_rad)
+
 
 try:
     sol_rad = sol_rad_from_sun_hours(dl_hours, sun_hours, etrad)
@@ -1020,6 +1031,9 @@ ws = wind_speed_2m(meanwindspeed, 10)
 
 es = mean_es(tmin, tmax)
 
+print 'py3 [sol_rad=%s ra=%s ea=%s ni_sw_rad=%s no_lw_rad=%s rn=%s t=%s ws=%s es=%s]' % (sol_rad,Ra,ea,ni_sw_rad,no_lw_rad,Rn,t,ws,es)
+
+
 # ea done in Rn calcs
 # Calc delta_es
 
@@ -1029,6 +1043,8 @@ delta_es = delta_sat_vap_pres(t)
 
 atmospres = atmos_pres(alt)
 psy       = psy_const(atmospres)
+
+print 'py4 [delta_es=%s atmospres=%s psy=%s]' % (delta_es, atmospres, psy)
 
 ############################## Print Results ###################################
 
