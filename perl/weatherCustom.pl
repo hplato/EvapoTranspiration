@@ -240,8 +240,8 @@ sub getwuData {
 #print "key=$key, loc=$loc\n";    
 	my $ua = new LWP::UserAgent( keep_alive => 1 );
 
-#    my $request = HTTP::Request->new( GET => "http://api.wunderground.com/api/$key/astronomy/yesterday/conditions/forecast/q/$loc.json" );
-    my $request = HTTP::Request->new( GET => "http://192.168.0.50/$loc.json" );
+    my $request = HTTP::Request->new( GET => "http://api.wunderground.com/api/$key/astronomy/yesterday/conditions/forecast/q/$loc.json" );
+#    my $request = HTTP::Request->new( GET => "http://192.168.0.50/$loc.json" );
 
     my $responseObj = $ua->request($request);
     my $data;
@@ -403,6 +403,8 @@ sub getConditionsData {
 
 #
 sub sun_block {
+# Difference from Python script. If there are multiple forecasts for a given hour (ie overcast and scattered clouds), then it will
+# take the last entry for calculating cover. Could average it, but really the difference isn't that huge I don't think.
 	my ($sunrise, $sunset) = @_;
     my $sh = 0;
     my $previousCloudCover = 0;
@@ -418,7 +420,7 @@ sub sun_block {
         for (my $period = 0; $period < scalar (@{$wuData->{history}->{observations}}); $period++) {
             if (safe_int($wuData->{history}->{observations}->[$period]->{date}->{hour}, -1) == $hour ) {
                 if ($wuData->{history}->{observations}->[$period]->{conds}) {
-#                	print "[$hour," . $wuData->{history}->{observations}->[$period]->{conds} . "," . $conditions->{$wuData->{history}->{observations}->[$period]->{conds}} . "]\n";
+                	print "[$hour," . $wuData->{history}->{observations}->[$period]->{conds} . "," . $conditions->{$wuData->{history}->{observations}->[$period]->{conds}} . "]\n";
                     $cloudCover = safe_float($conditions->{$wuData->{history}->{observations}->[$period]->{conds}}, 5) / 10;
                     unless (defined $cloudCover) {
                    		$cloudCover = 10;
@@ -430,14 +432,14 @@ sub sun_block {
 
         # Found nothing, let's assume it was the same as last hour
         $cloudCover = $previousCloudCover if ($cloudCover == -1);
-#print "[$hour,$cloudCover]\n";            
+print "[$hour,$cloudCover]\n";            
         #
 
         $previousCloudCover = $cloudCover;
         
-#print "bob $sh $cloudCover\n";
         # Got something now? let's check
         $sh += 1 - $cloudCover if ($cloudCover != -1);
+print "bob $sh $cloudCover\n";
             
         #
     }
@@ -715,8 +717,10 @@ print "yET = " . join(',',@$yET) . "\n";
 #                                   safe_int(data['mmTime'][x]) * maxRunmm))
 			my $tminrun = safe_int($data_1mm->{mmTime}[$x]);
 			$tminrun = 0 unless $aET >= $minRunmm;
+			$tminrun = int($tminrun * $aET);
 			$tminrun = 0 if $noWater;
 			my $tmaxrun = safe_int($data_1mm->{mmTime}[$x]) * $maxRunmm;
+			print "E: HP mmTime = " . $data_1mm->{mmTime}[$x] . " tminrun=$tminrun tmaxrum=$tmaxrun\n";
 			push (@runTime,  min ($tminrun, $tmaxrun));
 		}
             #
@@ -755,7 +759,7 @@ print "yET = " . join(',',@$yET) . "\n";
         # #########################################
 	if (open (FILE, ">$ETPath/$fname")) {
 		my $Data = "[";
-		for (my $x = 0; $x > scalar (@ET); $x++) {
+		for (my $x = 0; $x < scalar (@ET); $x++) {
 			my $delim = "";
 			$delim = ", " unless $x == 0; 
 			$Data .= $delim . $ET[$x];
